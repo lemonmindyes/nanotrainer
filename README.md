@@ -1,21 +1,25 @@
-# NanoTrainer
+<div align = "center">
 
-<div align="center">
-    A lightweight and extensible training framework for PyTorch.
-    [简体中文](README_zh.md) | English
+![logo](./assert/logo.png)
+
 </div>
 
+* This open source project is perfect for training deep learning with simple and flexible configuration.
+* **NanoTrainer** offers many of the common configurations that are available, single card strategy, DDP strategy.
+* The project provides a variety of learning rate strategies, a callback mechanism.
+* **NanoTrainer** offers a wide range of common models.
+* **NanoTrainer** is mainly for the flexibility of training process, without over-packaging like pytorch lightling and huggingface.
 
 
 ---
 
 ## Introduction
 
-NanoTrainer is a minimal yet powerful training framework built on top of Pytorch.
+**NanoTrainer** is a tiny training framework built on top of Pytorch, 
 
-It provides a clean abstraction layer for managing training loops while keeping
+which provides a clear process for controlling the training process and 
 
-full control over low-level details.
+keeping control over the various details of the training.
 
 
 
@@ -23,7 +27,7 @@ It is designed for:
 
 - Researchers who want to experiment with new training strategies.
 - Engineers who want to build custom training systems.
-- Anyone tired of writing `for epoch` loops again and again.
+- Anyone tired of writing for loops again and again.
 
 ---
 
