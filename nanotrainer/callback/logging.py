@@ -1,3 +1,4 @@
+import time
 from collections import deque
 
 import matplotlib.pyplot as plt
@@ -19,21 +20,26 @@ class ModelSummaryCallback(Callback):
 
 class LoggingCallback(Callback):
 
-    def __init__(self, log_interval = 10):
+    def __init__(self, log_interval = 100):
         self.log_interval = log_interval
+
+        self.start_time = None
 
     def _print(self, trainer):
         e = trainer.state.epoch + 1
         step = trainer.state.global_step
         loss = trainer.state.loss
         lr = trainer.optimizer.param_groups[0]['lr']
-        print(f'Epoch: {e}, Step: {step}, Loss: {loss:.2f}, LR: {lr:.6f}')
+        print(f'Epoch: {e}, Step: {step}, Loss: {loss:.2f}, LR: {lr:.6f}, Time: {time.time() - self.start_time:.2f}')
 
     def on_step_end(self, trainer):
         if trainer.state.global_step % self.log_interval == 0:
             self._print(trainer)
         else:
             return
+
+    def on_train_begin(self, trainer):
+        self.start_time = time.time()
 
     def on_train_end(self, trainer):
         if trainer.state.global_step % self.log_interval != 0:
@@ -79,5 +85,5 @@ class RealtimePlotCallback(Callback):
         self.ax_lr.set_xlabel("Step")
         self.ax_lr.set_ylabel("Learning Rate")
 
-        plt.pause(0.001)
+        plt.pause(0.1)
 
