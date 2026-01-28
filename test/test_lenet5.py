@@ -64,10 +64,15 @@ if __name__ == '__main__':
     model = cv.LeNet5(config)
     loss_func = Loss()
     opt = torch.optim.AdamW(model.parameters(), lr = 1e-3, weight_decay = 1e-4)
-    cosine_lr_scheduler = lr_scheduler.CosineWarmupDecay(opt,
+    cosine_lr_scheduler = lr_scheduler.WarmupCosineDecay(opt,
                                                          warmup_ratio = warmup_ratio,
                                                          min_lr = 1e-5
                                                          )
+    # poly_lr_scheduler = lr_scheduler.WarmupPolyDecay(opt,
+    #                                                  warmup_ratio = warmup_ratio,
+    #                                                  power = 0.9,
+    #                                                  min_lr = 1e-5
+    #                                                  )
     strategy = single.SingleStrategy(
         model,
         opt,
@@ -79,6 +84,8 @@ if __name__ == '__main__':
         save_interval = 1500,
         log_interval = 300,
     )
+    from nanotrainer import logging
+    callback.append(logging.RealtimePlotCallback())
 
     trainer = trainer.Trainer(
         device = device,
