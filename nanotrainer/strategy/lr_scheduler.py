@@ -128,6 +128,43 @@ class WarmupPolyDecay(WarmupSchedulerBase):
         ]
 
 
+class WarmupLinearDecay(WarmupSchedulerBase):
+    
+    def __init__(self,
+                 optimizer: torch.optim.Optimizer,
+                 warmup_ratio: float,
+                 min_lr: float = 0.0,
+                 last_epoch: int = -1
+                 ):
+        super().__init__(optimizer, warmup_ratio, min_lr, last_epoch)
+
+    def get_lr(self):
+        if self.total_steps is None:
+            return self.base_lrs
+        assert self.total_steps is not None, \
+            'You must call scheduler.set_total_steps() before training'
+        step = self.last_epoch + 1 # optimizer step index
+
+        # 1. Linear warmup
+        if step < self.warmup_steps:
+            scale = step / max(1, self.warmup_steps)
+            return [
+                base_lr * scale
+                for base_lr in self.base_lrs
+            ]
+
+        # 2. Linear decay
+        progress = (step - self.warmup_steps) / max(
+            1, self.total_steps - self.warmup_steps
+        )
+        progress = min(progress, 1.0)
+
+        return [
+            self.min_lr + (base_lr - self.min_lr) * (1.0 - progress)
+            for base_lr in self.base_lrs
+        ]
+
+
 class OneCycleDecay(WarmupSchedulerBase):
     """
     One-cycle learning rate scheduler with linear warmup.
