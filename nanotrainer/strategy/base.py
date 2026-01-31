@@ -65,61 +65,6 @@ class Strategy:
         pass
 
 
-class WarmupSchedulerBase(LRScheduler):
-    """
-    Base class for schedulers with warmup + decay.
-
-    This class handles:
-        - warmup_ratio
-        - lazy_init(total_steps)
-        - warmup_steps computation
-
-    Subclasses should
-    """
-
-    def __init__(self,
-                 optimizer: torch.optim.Optimizer,
-                 warmup_ratio: float = None,
-                 min_lr: float = None,
-                 last_epoch: int = -1
-                 ):
-        """
-        Args:
-            optimizer: Wrapped optimizer.
-            warmup_ratio: Ratio of warmup steps relative to total optimizer steps.
-                          Value should be in (0, 1).
-            min_lr: Minimum learning rate at the end of decay.
-            last_epoch: Index of last optimizer step.
-                        Should remain -1 for fresh training./
-        """
-        if warmup_ratio is not None:
-            assert 0.0 <= warmup_ratio <= 1.0, \
-                f'Invalid warmup_ratio = {warmup_ratio}. It must be in the range [0.0, 1.0].'
-        if min_lr is not None:
-            assert min_lr >= 0.0, \
-                f'Invalid min_lr = {min_lr}. It must be non-negative.'
-        self.warmup_ratio = warmup_ratio
-        self.min_lr = min_lr
-
-        # injected by Trainer
-        self.total_steps = None
-        self.warmup_steps = None
-
-        super().__init__(optimizer, last_epoch)
-
-    def lazy_init(self, total_steps: int):
-        """
-        Inject real training time axis
-
-        This method must be called before training starts.
-
-        Args:
-            total_steps: Total number of optimizer update steps
-        """
-        self.total_steps = total_steps
-        self.warmup_steps = int(total_steps * self.warmup_ratio)
-
-
 class Precision(Enum):
     """
     Enumeration of supported numerical precisions.

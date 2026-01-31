@@ -1,274 +1,125 @@
 import math
 
 import torch
-from .base import WarmupSchedulerBase
+from torch.optim.lr_scheduler import LRScheduler
 
 
-class WarmupCosineDecay(WarmupSchedulerBase):
-    """
-    Cosine learning rate scheduler with linear warmup.
+class LinearWarmup:
 
-    This scheduler operates on *optimizer steps*, not forward steps.
-    The real training time axis must be injected via `lazy_init`
-    before the first optimizer update.
+    def __init__(self):
+        pass
 
-    Typical lifecycle:
-        1. Construct scheduler.
-        2. Trainer computes real optimizer step count.
-        3. Trainer calls `lazy_init(total_steps)`.
-        4. Strategy calls `scheduler.step()` after each optimizer.step().
-    """
+    def get_lrs(self,
+                base_lrs: list[float],
+                step: int,
+                warmup_steps: int,
+                ):
+        scale = step / max(1, warmup_steps)
+        return [
+            lr * scale
+            for lr in base_lrs
+        ]
+
+
+class ExpWarmup:
+
+    def __init__(self, exp_ratio = 5.0):
+        self.exp_ratio = exp_ratio
+
+    def get_lrs(self,
+                base_lrs: list[float],
+                step: int,
+                warmup_steps: int,
+                ):
+        x = step / max(1, warmup_steps)
+        scale = (math.exp(self.exp_ratio * x) - 1.0) / (math.exp(self.exp_ratio) - 1.0)
+        return [
+            lr * scale
+            for lr in base_lrs
+        ]
+
+
+class LinearDecay:
+
+    def __init__(self):
+        pass
+
+    def get_lrs(self,
+                base_lrs: list[float],
+                min_lr: float,
+                step: int,
+                warmup_steps: int,
+                total_steps: int
+                ):
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        progress = min(progress, 1.0)
+        return [
+            min_lr + (lr - min_lr) * (1.0 - progress)
+            for lr in base_lrs
+        ]
+
+
+class CosineDecay:
+
+    def __init__(self):
+        pass
+
+    def get_lrs(self,
+                base_lrs: list[float],
+                min_lr: float,
+                step: int,
+                warmup_steps: int,
+                total_steps: int
+                ):
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        progress = min(progress, 1.0)
+        return [
+            min_lr + 0.5 * (lr - min_lr) * (1.0 + math.cos(math.pi * progress))
+            for lr in base_lrs
+        ]
+
+
+class ComposedLRScheduler(LRScheduler):
 
     def __init__(self,
                  optimizer: torch.optim.Optimizer,
                  warmup_ratio: float,
                  min_lr: float = 0.0,
-                 last_epoch: int = -1
+                 last_epoch: int = -1,
+                 callback: callable = None,
                  ):
-        super().__init__(optimizer, warmup_ratio, min_lr, last_epoch)
+        assert 0.0 <= warmup_ratio < 1.0, \
+            f'warmup_ratio must be in [0.0, 1.0)'
+        assert min_lr >= 0.0, \
+            f'min_lr must be >= 0.0'
 
-    def get_lr(self):
-        """
-        Compute learning rate for current optimizer step.
-
-        Note:
-            During scheduler construction, Pytorch will trigger
-            an initial step. In this case, time axis is not ready
-            and base learning rates are returned.
-        """
-        # Construction phase: return base learning rates
-        if self.total_steps is None:
-            return self.base_lrs
-        assert self.total_steps is not None, \
-            'You must call scheduler.set_total_steps() before training'
-        step = self.last_epoch + 1 # optimizer step index
-
-        # 1. Linear warmup phase
-        if step < self.warmup_steps:
-            scale = step / max(1, self.warmup_steps)
-            return [
-                base_lr * scale
-                for base_lr in self.base_lrs
+        self.warmup_ratio = warmup_ratio
+        self.min_lr = min_lr
+        if callback is None:
+            self.callback = [
+                LinearWarmup(),
+                LinearDecay(),
             ]
-
-        # 2. Cosine decay phase
-        progress = (step - self.warmup_steps) / max(
-            1, self.total_steps - self.warmup_steps
-        )
-        progress = min(progress, 1.0)
-        return [
-            self.min_lr + 0.5 * (base_lr - self.min_lr) * (1.0 + math.cos(math.pi * progress))
-            for base_lr in self.base_lrs
-        ]
-
-
-class WarmupPolyDecay(WarmupSchedulerBase):
-    """
-    Polynomial learning rate scheduler with linear warmup.
-
-    This scheduler operates on *optimizer steps*, not forward steps.
-    The real training time axis must be injected via `lazy_init`
-    before the first optimizer update.
-
-    Typical lifecycle:
-    1. Construct scheduler.
-    2. Trainer computes real optimizer step count.
-    3. Trainer calls `lazy_init(total_steps)`.
-    4. Strategy calls `scheduler.step()` after each optimizer.step().
-    """
-
-    def __init__(self,
-                 optimizer: torch.optim.Optimizer,
-                 warmup_ratio: float,
-                 power: float = 0.9,
-                 min_lr: float = 0.0,
-                 last_epoch: int = -1
-                 ):
-        """
-        Args:
-            power: Polynomial decay power.
-                   Typical values: 0.9 (default), 1.0.
-        """
-        super().__init__(optimizer, warmup_ratio, min_lr, last_epoch)
-        self.power = power
-
-    def get_lr(self):
-        """
-        Compute learning rate for current optimizer step.
-
-        Note:
-            During scheduler construction, Pytorch will trigger
-            an initial step. In this case, time axis is not ready
-            and base learning rates are returned.
-        """
-        # Construction phase: return base learning rates
-        if self.total_steps is None:
-            return self.base_lrs
-        assert self.total_steps is not None, \
-            'You must call scheduler.set_total_steps() before training'
-        step = self.last_epoch + 1
-
-        # 1. Linear warmup phase
-        if step < self.warmup_steps:
-            scale = step / max(1, self.warmup_steps)
-            return [
-                base_lr * scale
-                for base_lr in self.base_lrs
-            ]
-
-        # 2. Polynomial decay
-        progress = (step - self.warmup_steps) / max(
-            1, self.total_steps - self.warmup_steps
-        )
-        progress = min(progress, 1.0)
-        return [
-            self.min_lr +
-            (base_lr - self.min_lr) * (1.0 - progress) ** self.power
-            for base_lr in self.base_lrs
-        ]
-
-
-class WarmupLinearDecay(WarmupSchedulerBase):
-    
-    def __init__(self,
-                 optimizer: torch.optim.Optimizer,
-                 warmup_ratio: float,
-                 min_lr: float = 0.0,
-                 last_epoch: int = -1
-                 ):
-        super().__init__(optimizer, warmup_ratio, min_lr, last_epoch)
-
-    def get_lr(self):
-        if self.total_steps is None:
-            return self.base_lrs
-        assert self.total_steps is not None, \
-            'You must call scheduler.set_total_steps() before training'
-        step = self.last_epoch + 1 # optimizer step index
-
-        # 1. Linear warmup
-        if step < self.warmup_steps:
-            scale = step / max(1, self.warmup_steps)
-            return [
-                base_lr * scale
-                for base_lr in self.base_lrs
-            ]
-
-        # 2. Linear decay
-        progress = (step - self.warmup_steps) / max(
-            1, self.total_steps - self.warmup_steps
-        )
-        progress = min(progress, 1.0)
-
-        return [
-            self.min_lr + (base_lr - self.min_lr) * (1.0 - progress)
-            for base_lr in self.base_lrs
-        ]
-
-
-class ExpWarmupCosineDecay(WarmupSchedulerBase):
-
-    def __init__(self,
-                 optimizer: torch.optim.Optimizer,
-                 warmup_ratio: float,
-                 min_lr: float = 0.0,
-                 warmup_exp_ratio: float = 5.0,
-                 last_epoch: int = -1
-                 ):
-        self.warmup_exp_ratio = warmup_exp_ratio
-        super().__init__(optimizer, warmup_ratio, min_lr, last_epoch)
-
-    def get_lr(self):
-        if self.total_steps is None:
-            return self.base_lrs
-        assert self.total_steps is not None, \
-            'You must call scheduler.set_total_steps() before training'
-        step = self.last_epoch + 1 # optimizer step index
-
-        # 1. Exponential warmup
-        if step < self.warmup_steps:
-            x = step / max(1, self.warmup_steps)
-            scale = math.exp(self.warmup_exp_ratio * (x - 1.0))
-            return [
-                base_lr * scale
-                for base_lr in self.base_lrs
-            ]
-
-        # 2. Cosine decay
-        progress = (step - self.warmup_steps) / max(
-            1, self.total_steps - self.warmup_steps
-        )
-        progress = min(progress, 1.0)
-        return [
-            self.min_lr + 0.5 * (base_lr - self.min_lr) * (1.0 + math.cos(math.pi * progress))
-            for base_lr in self.base_lrs
-        ]
-
-
-class OneCycleDecay(WarmupSchedulerBase):
-    """
-    One-cycle learning rate scheduler with linear warmup.
-
-    This scheduler operates on *optimizer steps*, not forward steps.
-    The real training time axis must be injected via `lazy_init`
-    before the first optimizer update.
-
-    Typical lifecycle:
-    1. Construct scheduler.
-    2. Trainer computes real optimizer step count.
-    3. Trainer calls `lazy_init(total_steps)`.
-    4. Strategy calls `scheduler.step()` after each optimizer.step().
-    """
-
-    def __init__(self,
-                 optimizer: torch.optim.Optimizer,
-                 pct_start: float = 0.3,
-                 div_factor: float = 25.0,
-                 final_div_factor: float = 1e4,
-                 last_epoch: int = -1
-                 ):
-        self.pct_start = pct_start
-        self.div_factor = div_factor
-        self.final_div_factor = final_div_factor
-
-        super().__init__(optimizer, warmup_ratio = pct_start, min_lr = None, last_epoch = last_epoch)
+        else:
+            self.callback = callback
 
         # injected by Trainer
-        self.initial_lrs = None
-        self.min_lrs = None
+        self.total_steps = None
+        self.warmup_steps = None
+
+        super().__init__(optimizer, last_epoch)
 
     def lazy_init(self, total_steps: int):
         self.total_steps = total_steps
         self.warmup_steps = int(total_steps * self.warmup_ratio)
 
-        self.initial_lrs = [
-            lr / self.div_factor for lr in self.base_lrs
-        ]
-        self.min_lrs = [
-            lr / self.final_div_factor for lr in self.base_lrs
-        ]
-
     def get_lr(self):
-        # Construction phase: return base learning rates
         if self.total_steps is None:
             return self.base_lrs
-        assert self.total_steps is not None, \
-            'You must call scheduler.set_total_steps() before training'
-        step = self.last_epoch + 1
+        step = self.last_epoch + 1  # optimizer step index
 
-        # 1. Increase phase: initial -> max
         if step < self.warmup_steps:
-            progress = step / max(1, self.warmup_steps)
-            return [
-                init_lr + 0.5 * (base_lr - init_lr) * (1.0 + math.cos(math.pi * (1.0 - progress)))
-                for base_lr, init_lr in zip(self.base_lrs, self.initial_lrs)
-            ]
+            return self.callback[0].get_lrs(self.base_lrs, step, self.warmup_steps)
+        else:
+            return self.callback[1].get_lrs(self.base_lrs, self.min_lr, step, self.warmup_steps, self.total_steps)
 
-        # 2. Cosine decay phase
-        progress = (step - self.warmup_steps) / max(
-            1, self.total_steps - self.warmup_steps
-        )
-        progress = min(progress, 1.0)
-        return [
-            min_lr + 0.5 * (base_lr - min_lr) * (1.0 + math.cos(math.pi * progress))
-            for base_lr, min_lr in zip(self.base_lrs, self.min_lrs)
-        ]
