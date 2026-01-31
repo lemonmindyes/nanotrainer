@@ -59,6 +59,28 @@ class LinearDecay:
         ]
 
 
+class PolynomialDecay:
+
+    def __init__(self, power: float = 5.0):
+        self.power = power
+
+    def get_lrs(self,
+                base_lrs: list[float],
+                min_lr: float,
+                step: int,
+                warmup_steps: int,
+                total_steps: int
+                ):
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        progress = min(progress, 1.0)
+
+        scale = (1.0 - progress) ** self.power
+        return [
+            min_lr + (lr - min_lr) * scale
+            for lr in base_lrs
+        ]
+
+
 class CosineDecay:
 
     def __init__(self):
@@ -75,6 +97,36 @@ class CosineDecay:
         progress = min(progress, 1.0)
         return [
             min_lr + 0.5 * (lr - min_lr) * (1.0 + math.cos(math.pi * progress))
+            for lr in base_lrs
+        ]
+
+
+class MultiStepDecay:
+
+    def __init__(self, milestones: list[float], gamma: float = 0.1):
+        super().__init__()
+        self.milestones = milestones
+        self.gamma = gamma
+
+    def get_lrs(self,
+                base_lrs: list[float],
+                min_lr: float,
+                step: int,
+                warmup_steps: int,
+                total_steps: int
+                ):
+        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+        progress = min(1.0, max(0.0, progress))
+
+        k = 0
+        for m in self.milestones:
+            if progress >= m:
+                k += 1
+            else:
+                break
+        scale = self.gamma ** k
+        return [
+            lr * scale
             for lr in base_lrs
         ]
 
