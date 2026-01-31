@@ -54,8 +54,8 @@ def train_step(model, loss_func, batch, device):
 if __name__ == '__main__':
     device = torch.device('cpu')
     max_steps = 5000
-    warmup_ratio = 0.03
-    gradient_accumulation_steps = 4
+    warmup_ratio = 0.1
+    gradient_accumulation_steps = 1
 
     train_dataset = MNISTDataset(root = "../data")
     train_loader = DataLoader(train_dataset, batch_size = 64, shuffle = True)
@@ -64,25 +64,26 @@ if __name__ == '__main__':
     model = cv.LeNet5(config)
     loss_func = Loss()
     opt = torch.optim.AdamW(model.parameters(), lr = 1e-3, weight_decay = 1e-4)
-    cosine_lr_scheduler = lr_scheduler.WarmupCosineDecay(opt,
-                                                         warmup_ratio = warmup_ratio,
-                                                         min_lr = 1e-5
-                                                         )
-    # poly_lr_scheduler = lr_scheduler.WarmupPolyDecay(opt,
-    #                                                  warmup_ratio = warmup_ratio,
-    #                                                  power = 0.9,
-    #                                                  min_lr = 1e-5
-    #                                                  )
+
+    lr_scheduler = lr_scheduler.ComposedLRScheduler(
+        opt,
+        warmup_ratio = warmup_ratio,
+        min_lr = 1e-5,
+        callback = [
+            lr_scheduler.LinearWarmup(),
+            lr_scheduler.CosineDecay(),
+        ]
+    )
     strategy = single.SingleStrategy(
         model,
         opt,
-        lr_scheduler = cosine_lr_scheduler,
+        lr_scheduler = lr_scheduler,
         gradient_accumulation_steps = gradient_accumulation_steps
     )
     callback = default.get_default_callbacks(
         save_path = "../model/lenet5",
         save_interval = 1500,
-        log_interval = 300,
+        log_interval = 500,
     )
     from nanotrainer import logging
     callback.append(logging.RealtimePlotCallback())
