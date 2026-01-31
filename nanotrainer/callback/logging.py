@@ -2,6 +2,7 @@ import time
 from collections import deque
 
 import matplotlib.pyplot as plt
+import yaml
 
 from .base import Callback
 
@@ -90,3 +91,79 @@ class RealtimePlotCallback(Callback):
 
         plt.pause(0.1)
 
+
+class ExperimentCallback(Callback):
+
+    def __init__(self, save_path: str):
+        self.save_path = save_path
+
+    def on_train_begin(self, trainer):
+        batch_size = trainer.dataloader.batch_size
+        num_workers = trainer.dataloader.num_workers
+        pin_memory = trainer.dataloader.pin_memory
+        drop_last = trainer.dataloader.drop_last
+
+        model_name = trainer.model.__class__.__name__
+        total_params = sum(p.numel() for p in trainer.model.parameters())
+        total_trainable_params = sum(p.numel() for p in trainer.model.parameters() if p.requires_grad)
+
+        optimizer = trainer.optimizer.__class__.__name__
+        lr = trainer.optimizer.param_groups[0]['lr']
+        weight_decay = trainer.optimizer.param_groups[0]['weight_decay']
+
+        strategy = trainer.strategy.__class__.__name__
+        device = trainer.strategy.device
+        precision = trainer.strategy.precision.value
+        use_amp = trainer.strategy.use_amp
+        gradient_clip_val = trainer.strategy.gradient_clip_val
+        gradient_accumulation_steps = trainer.strategy.gradient_accumulation_steps
+
+        warmup_scheduler = trainer.strategy.lr_scheduler.callback[0].__class__.__name__
+        decay_scheduler = trainer.strategy.lr_scheduler.callback[1].__class__.__name__
+        warmup_ratio = trainer.strategy.lr_scheduler.warmup_ratio
+        min_lr = trainer.strategy.lr_scheduler.min_lr
+
+        callback_names = [callback.__class__.__name__ for callback in trainer.callback]
+
+        recoder = {
+            "dataloader": {
+                "batch_size": batch_size,
+                "num_workers": num_workers,
+                "pin_memory": pin_memory,
+                "drop_last": drop_last
+            },
+            "model": {
+                "name": model_name,
+                "total_params": total_params,
+                "total_trainable_params": total_trainable_params,
+            },
+            "strategy": {
+                "name": strategy,
+                "device": device,
+                "precision": precision,
+                "use_amp": use_amp,
+                "gradient_clip_val": gradient_clip_val,
+                "gradient_accumulation_steps": gradient_accumulation_steps
+            },
+            "optimizer": {
+                "name": optimizer,
+                "lr": lr,
+                "weight_decay": weight_decay
+            },
+            "lr_scheduler": {
+                "warmup_scheduler": warmup_scheduler,
+                "decay_scheduler": decay_scheduler,
+                "warmup_ratio": warmup_ratio,
+                "min_lr": min_lr
+            },
+            "callback": callback_names
+        }
+
+        with open(f'{self.save_path}/{model_name}.yaml', 'w', encoding = 'utf-8') as f:
+            yaml.dump(recoder,
+                      f,
+                      allow_unicode = True,
+                      sort_keys = False,
+                      default_flow_style = False,
+                      indent = 4
+                      )

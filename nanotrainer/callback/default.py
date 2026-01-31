@@ -1,4 +1,4 @@
-from .logging import ModelSummaryCallback, LoggingCallback
+from .logging import ModelSummaryCallback, LoggingCallback, ExperimentCallback
 from .checkpoint import CheckpointCallback
 
 
@@ -9,7 +9,8 @@ def get_default_callbacks(save_path: str,
                           log_interval: int = 100
                           ):
     return [
+        ExperimentCallback(save_path),
         ModelSummaryCallback(),
         LoggingCallback(log_interval),
-        CheckpointCallback(save_path, save_interval, auto_recover, recover_path),
+        CheckpointCallback(save_path, save_interval, auto_recover, recover_path)
     ]
