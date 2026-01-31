@@ -53,6 +53,8 @@ class RealtimePlotCallback(Callback):
     def __init__(self, max_points=1000, log_interval=10):
         super().__init__()
         self.log_interval = log_interval
+
+        self.step_list = deque(maxlen=max_points)
         self.loss_list = deque(maxlen=max_points)
         self.lr_list = deque(maxlen=max_points)
 
@@ -70,18 +72,19 @@ class RealtimePlotCallback(Callback):
         if trainer.state.global_step % self.log_interval != 0:
             return
 
+        self.step_list.append(trainer.state.global_step)
         self.loss_list.append(trainer.state.loss)
         self.lr_list.append(trainer.state.lr)
 
         # --- loss figure ---
         self.ax_loss.clear()
-        self.ax_loss.plot(self.loss_list)
+        self.ax_loss.plot(self.step_list, self.loss_list)
         self.ax_loss.set_xlabel("Step")
         self.ax_loss.set_ylabel("Loss")
 
         # --- lr figure ---
         self.ax_lr.clear()
-        self.ax_lr.plot(self.lr_list)
+        self.ax_lr.plot(self.step_list, self.lr_list)
         self.ax_lr.set_xlabel("Step")
         self.ax_lr.set_ylabel("Learning Rate")
 
