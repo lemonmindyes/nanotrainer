@@ -5,17 +5,6 @@ from torch.optim.lr_scheduler import LRScheduler
 class Strategy:
     """
     Base class for all training strategies.
-
-    A Strategy encapsulates all low-level training behaviors such as:
-    - mixed precision (AMP / FP16 / BF16)
-    - gradient accumulation
-    - gradient clipping
-    - optimizer stepping
-    - learning rate scheduling
-    - distributed logic (DDP, FSDP, etc.)
-
-    The Trainer should only interact with this interface and never
-    care about the concrete implementation.
     """
 
     def autocast_context(self):
@@ -34,18 +23,22 @@ class Strategy:
 
     def backward(self, loss: torch.Tensor):
         """
-        Backward propagation logic.
+        Backward gradient propagation.
 
         This method should handle:
             - loss scaling (if using GradScaler)
             - gradient accumulation
             - calling loss.backward() internally
 
+        Args:
+            loss (torch.Tensor):
+                Scalar loss tensor produced by the current forward pass.
+
         The Trainer must NOT call loss.backward() directly.
         """
         pass
 
-    def optimizer_step(self, force = False):
+    def optimizer_step(self, force: bool = False):
         """
         Perform an optimizer step.
 
@@ -67,7 +60,7 @@ class Strategy:
 
 class Precision(Enum):
     """
-    Enumeration of supported numerical precisions.
+    Enumeration of supported numerical precisions. (FP32,FP16,BF16)
     """
     FP32 = 'fp32'
     FP16 = 'fp16'
