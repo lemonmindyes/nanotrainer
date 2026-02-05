@@ -5,18 +5,57 @@ import matplotlib.pyplot as plt
 import yaml
 
 from .base import Callback
+from ..trainer.trainer import Trainer
 
 
 class ModelSummaryCallback(Callback):
 
+    def _format_param_count(self, num: int) -> str:
+        """
+        Format parameter count into a human-readable string.
+
+        Args:
+            num (int): model parameter count.
+
+        Returns:
+            - 1e2 ~ 1e4 -> 0.1k ~ 10k
+            - 1e5 ~ 1e7 -> 0.1M ~ 10M
+            - >= 1e8    -> 0.1B ~
+        """
+        if num < 1e2:
+            return str(num)
+
+        elif num < 1e5:
+            value = num / 1e3
+            unit = 'k'
+
+        elif num < 1e8:
+            value = num / 1e6
+            unit = 'M'
+
+        else:
+            value = num / 1e9
+            unit = 'B'
+
+        value = round(value, 1)
+        value = int(value) if value.is_integer() else value
+        return f'{value}{unit}'
+
     def on_train_begin(self, trainer):
+        """
+        Compute and report the total number of parameters and
+        trainable parameters at the beginning of training.
+
+        Args:
+            trainer (Trainer): The core training controller.
+        """
         model = trainer.model
 
         total_params = sum(p.numel() for p in model.parameters())
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f'Model Summary')
-        print(f'Total parameters:     {total_params / 1e7:.2f}M')
-        print(f'Trainable parameters: {trainable_params / 1e7:.2f}M')
+        print(f'Total parameters:     {self._format_param_count(total_params)}')
+        print(f'Trainable parameters: {self._format_param_count(trainable_params)}')
 
 
 class LoggingCallback(Callback):
@@ -150,7 +189,7 @@ class ExperimentCallback(Callback):
                 "lr": lr,
                 "weight_decay": weight_decay
             },
-            "lr_scheduler": {
+            "lr_scheduler.md": {
                 "warmup_scheduler": warmup_scheduler,
                 "decay_scheduler": decay_scheduler,
                 "warmup_ratio": warmup_ratio,
