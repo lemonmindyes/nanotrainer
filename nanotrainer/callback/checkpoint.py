@@ -24,7 +24,7 @@ class CheckpointCallback(Callback):
                                 - 'resume': load model, optimizer, lr scheduler, scaler, etc.
                                             to continue interrupted training.
                                 - 'restart': only load model weights, typically used for fine-tuning or re-training.
-            recover_path (str): Path to the checkpoint file used for recovery
+            recover_path (str): Path to the checkpoint file used for recovery.
         """
         super().__init__()
         self.save_path = save_path
