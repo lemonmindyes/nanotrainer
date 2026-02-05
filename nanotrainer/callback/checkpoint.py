@@ -3,6 +3,7 @@ import os
 import torch
 
 from .base import Callback
+from ..trainer.trainer import Trainer
 
 
 class CheckpointCallback(Callback):
@@ -13,13 +14,31 @@ class CheckpointCallback(Callback):
                  auto_recover: str = None,
                  recover_path: str = None
                  ):
+        """
+        Initialize the checkpoint callback.
+
+        Args:
+            save_path (str): Path to save checkpoint files.
+            save_interval (int): Save a checkpoint every N training steps.
+            auto_recover (str): Recover mode when resuming from a checkpoint.
+                                - 'resume': load model, optimizer, lr scheduler, scaler, etc.
+                                            to continue interrupted training.
+                                - 'restart': only load model weights, typically used for fine-tuning or re-training.
+            recover_path (str): Path to the checkpoint file used for recovery
+        """
         super().__init__()
         self.save_path = save_path
         self.save_interval = save_interval
         self.auto_recover = auto_recover
         self.recover_path = recover_path
 
-    def on_train_begin(self, trainer):
+    def on_train_begin(self, trainer: Trainer):
+        """
+        Perform initialization according to the `auto_recover` setting when training starts.
+
+        Args:
+            trainer (Trainer): The core training controller.
+        """
         if self.auto_recover is None:
             return
 
@@ -46,6 +65,13 @@ class CheckpointCallback(Callback):
             trainer.state.global_step = 0
 
     def on_step_end(self, trainer):
+        """
+        Save all training states every `save_interval` steps, including
+        the model, optimizer, lr scheduler, scaler, and other related states.
+
+        Args:
+            trainer (Trainer): The core training controller.
+        """
         if trainer.state.global_step % self.save_interval != 0:
             return
 
@@ -68,6 +94,12 @@ class CheckpointCallback(Callback):
         torch.save(checkpoint, path)
 
     def on_train_end(self, trainer):
+        """
+        Save the model weights at the end of training.
+
+        Args:
+            trainer (Trainer): The core training controller.
+        """
         checkpoint = {
             "model": trainer.model.state_dict(),
         }
